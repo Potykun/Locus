@@ -1,5 +1,6 @@
 (() => {
     "use strict";
+    const flsModules = {};
     function isWebp() {
         function testWebP(callback) {
             let webP = new Image;
@@ -13,6 +14,99 @@
             document.documentElement.classList.add(className);
         }));
     }
+    let isMobile = {
+        Android: function() {
+            return navigator.userAgent.match(/Android/i);
+        },
+        BlackBerry: function() {
+            return navigator.userAgent.match(/BlackBerry/i);
+        },
+        iOS: function() {
+            return navigator.userAgent.match(/iPhone|iPad|iPod/i);
+        },
+        Opera: function() {
+            return navigator.userAgent.match(/Opera Mini/i);
+        },
+        Windows: function() {
+            return navigator.userAgent.match(/IEMobile/i);
+        },
+        any: function() {
+            return isMobile.Android() || isMobile.BlackBerry() || isMobile.iOS() || isMobile.Opera() || isMobile.Windows();
+        }
+    };
+    function getHash() {
+        if (location.hash) return location.hash.replace("#", "");
+    }
+    function setHash(hash) {
+        hash = hash ? `#${hash}` : window.location.href.split("#")[0];
+        history.pushState("", "", hash);
+    }
+    let _slideUp = (target, duration = 500, showmore = 0) => {
+        if (!target.classList.contains("_slide")) {
+            target.classList.add("_slide");
+            target.style.transitionProperty = "height, margin, padding";
+            target.style.transitionDuration = duration + "ms";
+            target.style.height = `${target.offsetHeight}px`;
+            target.offsetHeight;
+            target.style.overflow = "hidden";
+            target.style.height = showmore ? `${showmore}px` : `0px`;
+            target.style.paddingTop = 0;
+            target.style.paddingBottom = 0;
+            target.style.marginTop = 0;
+            target.style.marginBottom = 0;
+            window.setTimeout((() => {
+                target.hidden = !showmore ? true : false;
+                !showmore ? target.style.removeProperty("height") : null;
+                target.style.removeProperty("padding-top");
+                target.style.removeProperty("padding-bottom");
+                target.style.removeProperty("margin-top");
+                target.style.removeProperty("margin-bottom");
+                !showmore ? target.style.removeProperty("overflow") : null;
+                target.style.removeProperty("transition-duration");
+                target.style.removeProperty("transition-property");
+                target.classList.remove("_slide");
+                document.dispatchEvent(new CustomEvent("slideUpDone", {
+                    detail: {
+                        target
+                    }
+                }));
+            }), duration);
+        }
+    };
+    let _slideDown = (target, duration = 500, showmore = 0) => {
+        if (!target.classList.contains("_slide")) {
+            target.classList.add("_slide");
+            target.hidden = target.hidden ? false : null;
+            showmore ? target.style.removeProperty("height") : null;
+            let height = target.offsetHeight;
+            target.style.overflow = "hidden";
+            target.style.height = showmore ? `${showmore}px` : `0px`;
+            target.style.paddingTop = 0;
+            target.style.paddingBottom = 0;
+            target.style.marginTop = 0;
+            target.style.marginBottom = 0;
+            target.offsetHeight;
+            target.style.transitionProperty = "height, margin, padding";
+            target.style.transitionDuration = duration + "ms";
+            target.style.height = height + "px";
+            target.style.removeProperty("padding-top");
+            target.style.removeProperty("padding-bottom");
+            target.style.removeProperty("margin-top");
+            target.style.removeProperty("margin-bottom");
+            window.setTimeout((() => {
+                target.style.removeProperty("height");
+                target.style.removeProperty("overflow");
+                target.style.removeProperty("transition-duration");
+                target.style.removeProperty("transition-property");
+                target.classList.remove("_slide");
+                document.dispatchEvent(new CustomEvent("slideDownDone", {
+                    detail: {
+                        target
+                    }
+                }));
+            }), duration);
+        }
+    };
     let bodyLockStatus = true;
     let bodyLockToggle = (delay = 500) => {
         if (document.documentElement.classList.contains("lock")) bodyUnlock(delay); else bodyLock(delay);
@@ -51,6 +145,103 @@
             }), delay);
         }
     };
+    function tabs() {
+        const tabs = document.querySelectorAll("[data-tabs]");
+        let tabsActiveHash = [];
+        if (tabs.length > 0) {
+            const hash = getHash();
+            if (hash && hash.startsWith("tab-")) tabsActiveHash = hash.replace("tab-", "").split("-");
+            tabs.forEach(((tabsBlock, index) => {
+                tabsBlock.classList.add("_tab-init");
+                tabsBlock.setAttribute("data-tabs-index", index);
+                tabsBlock.addEventListener("click", setTabsAction);
+                initTabs(tabsBlock);
+            }));
+            let mdQueriesArray = dataMediaQueries(tabs, "tabs");
+            if (mdQueriesArray && mdQueriesArray.length) mdQueriesArray.forEach((mdQueriesItem => {
+                mdQueriesItem.matchMedia.addEventListener("change", (function() {
+                    setTitlePosition(mdQueriesItem.itemsArray, mdQueriesItem.matchMedia);
+                }));
+                setTitlePosition(mdQueriesItem.itemsArray, mdQueriesItem.matchMedia);
+            }));
+        }
+        function setTitlePosition(tabsMediaArray, matchMedia) {
+            tabsMediaArray.forEach((tabsMediaItem => {
+                tabsMediaItem = tabsMediaItem.item;
+                let tabsTitles = tabsMediaItem.querySelector("[data-tabs-titles]");
+                let tabsTitleItems = tabsMediaItem.querySelectorAll("[data-tabs-title]");
+                let tabsContent = tabsMediaItem.querySelector("[data-tabs-body]");
+                let tabsContentItems = tabsMediaItem.querySelectorAll("[data-tabs-item]");
+                tabsTitleItems = Array.from(tabsTitleItems).filter((item => item.closest("[data-tabs]") === tabsMediaItem));
+                tabsContentItems = Array.from(tabsContentItems).filter((item => item.closest("[data-tabs]") === tabsMediaItem));
+                tabsContentItems.forEach(((tabsContentItem, index) => {
+                    if (matchMedia.matches) {
+                        tabsContent.append(tabsTitleItems[index]);
+                        tabsContent.append(tabsContentItem);
+                        tabsMediaItem.classList.add("_tab-spoller");
+                    } else {
+                        tabsTitles.append(tabsTitleItems[index]);
+                        tabsMediaItem.classList.remove("_tab-spoller");
+                    }
+                }));
+            }));
+        }
+        function initTabs(tabsBlock) {
+            let tabsTitles = tabsBlock.querySelectorAll("[data-tabs-titles]>*");
+            let tabsContent = tabsBlock.querySelectorAll("[data-tabs-body]>*");
+            const tabsBlockIndex = tabsBlock.dataset.tabsIndex;
+            const tabsActiveHashBlock = tabsActiveHash[0] == tabsBlockIndex;
+            if (tabsActiveHashBlock) {
+                const tabsActiveTitle = tabsBlock.querySelector("[data-tabs-titles]>._tab-active");
+                tabsActiveTitle ? tabsActiveTitle.classList.remove("_tab-active") : null;
+            }
+            if (tabsContent.length) {
+                tabsContent = Array.from(tabsContent).filter((item => item.closest("[data-tabs]") === tabsBlock));
+                tabsTitles = Array.from(tabsTitles).filter((item => item.closest("[data-tabs]") === tabsBlock));
+                tabsContent.forEach(((tabsContentItem, index) => {
+                    tabsTitles[index].setAttribute("data-tabs-title", "");
+                    tabsContentItem.setAttribute("data-tabs-item", "");
+                    if (tabsActiveHashBlock && index == tabsActiveHash[1]) tabsTitles[index].classList.add("_tab-active");
+                    tabsContentItem.hidden = !tabsTitles[index].classList.contains("_tab-active");
+                }));
+            }
+        }
+        function setTabsStatus(tabsBlock) {
+            let tabsTitles = tabsBlock.querySelectorAll("[data-tabs-title]");
+            let tabsContent = tabsBlock.querySelectorAll("[data-tabs-item]");
+            const tabsBlockIndex = tabsBlock.dataset.tabsIndex;
+            function isTabsAnamate(tabsBlock) {
+                if (tabsBlock.hasAttribute("data-tabs-animate")) return tabsBlock.dataset.tabsAnimate > 0 ? Number(tabsBlock.dataset.tabsAnimate) : 500;
+            }
+            const tabsBlockAnimate = isTabsAnamate(tabsBlock);
+            if (tabsContent.length > 0) {
+                const isHash = tabsBlock.hasAttribute("data-tabs-hash");
+                tabsContent = Array.from(tabsContent).filter((item => item.closest("[data-tabs]") === tabsBlock));
+                tabsTitles = Array.from(tabsTitles).filter((item => item.closest("[data-tabs]") === tabsBlock));
+                tabsContent.forEach(((tabsContentItem, index) => {
+                    if (tabsTitles[index].classList.contains("_tab-active")) {
+                        if (tabsBlockAnimate) _slideDown(tabsContentItem, tabsBlockAnimate); else tabsContentItem.hidden = false;
+                        if (isHash && !tabsContentItem.closest(".popup")) setHash(`tab-${tabsBlockIndex}-${index}`);
+                    } else if (tabsBlockAnimate) _slideUp(tabsContentItem, tabsBlockAnimate); else tabsContentItem.hidden = true;
+                }));
+            }
+        }
+        function setTabsAction(e) {
+            const el = e.target;
+            if (el.closest("[data-tabs-title]")) {
+                const tabTitle = el.closest("[data-tabs-title]");
+                const tabsBlock = tabTitle.closest("[data-tabs]");
+                if (!tabTitle.classList.contains("_tab-active") && !tabsBlock.querySelector("._slide")) {
+                    let tabActiveTitle = tabsBlock.querySelectorAll("[data-tabs-title]._tab-active");
+                    tabActiveTitle.length ? tabActiveTitle = Array.from(tabActiveTitle).filter((item => item.closest("[data-tabs]") === tabsBlock)) : null;
+                    tabActiveTitle.length ? tabActiveTitle[0].classList.remove("_tab-active") : null;
+                    tabTitle.classList.add("_tab-active");
+                    setTabsStatus(tabsBlock);
+                }
+                e.preventDefault();
+            }
+        }
+    }
     function menuInit() {
         if (document.querySelector(".icon-menu")) document.addEventListener("click", (function(e) {
             if (bodyLockStatus && e.target.closest(".icon-menu")) {
@@ -58,6 +249,285 @@
                 document.documentElement.classList.toggle("menu-open");
             }
         }));
+    }
+    function menuClose() {
+        bodyUnlock();
+        document.documentElement.classList.remove("menu-open");
+    }
+    function FLS(message) {
+        setTimeout((() => {
+            if (window.FLS) console.log(message);
+        }), 0);
+    }
+    function uniqArray(array) {
+        return array.filter((function(item, index, self) {
+            return self.indexOf(item) === index;
+        }));
+    }
+    function dataMediaQueries(array, dataSetValue) {
+        const media = Array.from(array).filter((function(item, index, self) {
+            if (item.dataset[dataSetValue]) return item.dataset[dataSetValue].split(",")[0];
+        }));
+        if (media.length) {
+            const breakpointsArray = [];
+            media.forEach((item => {
+                const params = item.dataset[dataSetValue];
+                const breakpoint = {};
+                const paramsArray = params.split(",");
+                breakpoint.value = paramsArray[0];
+                breakpoint.type = paramsArray[1] ? paramsArray[1].trim() : "max";
+                breakpoint.item = item;
+                breakpointsArray.push(breakpoint);
+            }));
+            let mdQueries = breakpointsArray.map((function(item) {
+                return "(" + item.type + "-width: " + item.value + "px)," + item.value + "," + item.type;
+            }));
+            mdQueries = uniqArray(mdQueries);
+            const mdQueriesArray = [];
+            if (mdQueries.length) {
+                mdQueries.forEach((breakpoint => {
+                    const paramsArray = breakpoint.split(",");
+                    const mediaBreakpoint = paramsArray[1];
+                    const mediaType = paramsArray[2];
+                    const matchMedia = window.matchMedia(paramsArray[0]);
+                    const itemsArray = breakpointsArray.filter((function(item) {
+                        if (item.value === mediaBreakpoint && item.type === mediaType) return true;
+                    }));
+                    mdQueriesArray.push({
+                        itemsArray,
+                        matchMedia
+                    });
+                }));
+                return mdQueriesArray;
+            }
+        }
+    }
+    let gotoBlock = (targetBlock, noHeader = false, speed = 500, offsetTop = 0) => {
+        const targetBlockElement = document.querySelector(targetBlock);
+        if (targetBlockElement) {
+            let headerItem = "";
+            let headerItemHeight = 0;
+            if (noHeader) {
+                headerItem = "header.header";
+                const headerElement = document.querySelector(headerItem);
+                if (!headerElement.classList.contains("_header-scroll")) {
+                    headerElement.style.cssText = `transition-duration: 0s;`;
+                    headerElement.classList.add("_header-scroll");
+                    headerItemHeight = headerElement.offsetHeight;
+                    headerElement.classList.remove("_header-scroll");
+                    setTimeout((() => {
+                        headerElement.style.cssText = ``;
+                    }), 0);
+                } else headerItemHeight = headerElement.offsetHeight;
+            }
+            let options = {
+                speedAsDuration: true,
+                speed,
+                header: headerItem,
+                offset: offsetTop,
+                easing: "easeOutQuad"
+            };
+            document.documentElement.classList.contains("menu-open") ? menuClose() : null;
+            if ("undefined" !== typeof SmoothScroll) (new SmoothScroll).animateScroll(targetBlockElement, "", options); else {
+                let targetBlockElementPosition = targetBlockElement.getBoundingClientRect().top + scrollY;
+                targetBlockElementPosition = headerItemHeight ? targetBlockElementPosition - headerItemHeight : targetBlockElementPosition;
+                targetBlockElementPosition = offsetTop ? targetBlockElementPosition - offsetTop : targetBlockElementPosition;
+                window.scrollTo({
+                    top: targetBlockElementPosition,
+                    behavior: "smooth"
+                });
+            }
+            FLS(`[gotoBlock]: Юхуу...едем к ${targetBlock}`);
+        } else FLS(`[gotoBlock]: Ой ой..Такого блока нет на странице: ${targetBlock}`);
+    };
+    function formFieldsInit(options = {
+        viewPass: false,
+        autoHeight: false
+    }) {
+        const formFields = document.querySelectorAll("input[placeholder],textarea[placeholder]");
+        if (formFields.length) formFields.forEach((formField => {
+            if (!formField.hasAttribute("data-placeholder-nohide")) formField.dataset.placeholder = formField.placeholder;
+        }));
+        document.body.addEventListener("focusin", (function(e) {
+            const targetElement = e.target;
+            if ("INPUT" === targetElement.tagName || "TEXTAREA" === targetElement.tagName) {
+                if (targetElement.dataset.placeholder) targetElement.placeholder = "";
+                if (!targetElement.hasAttribute("data-no-focus-classes")) {
+                    targetElement.classList.add("_form-focus");
+                    targetElement.parentElement.classList.add("_form-focus");
+                }
+                formValidate.removeError(targetElement);
+            }
+        }));
+        document.body.addEventListener("focusout", (function(e) {
+            const targetElement = e.target;
+            if ("INPUT" === targetElement.tagName || "TEXTAREA" === targetElement.tagName) {
+                if (targetElement.dataset.placeholder) targetElement.placeholder = targetElement.dataset.placeholder;
+                if (!targetElement.hasAttribute("data-no-focus-classes")) {
+                    targetElement.classList.remove("_form-focus");
+                    targetElement.parentElement.classList.remove("_form-focus");
+                }
+                if (targetElement.hasAttribute("data-validate")) formValidate.validateInput(targetElement);
+            }
+        }));
+        if (options.viewPass) document.addEventListener("click", (function(e) {
+            let targetElement = e.target;
+            if (targetElement.closest('[class*="__viewpass"]')) {
+                let inputType = targetElement.classList.contains("_viewpass-active") ? "password" : "text";
+                targetElement.parentElement.querySelector("input").setAttribute("type", inputType);
+                targetElement.classList.toggle("_viewpass-active");
+            }
+        }));
+        if (options.autoHeight) {
+            const textareas = document.querySelectorAll("textarea[data-autoheight]");
+            if (textareas.length) {
+                textareas.forEach((textarea => {
+                    const startHeight = textarea.hasAttribute("data-autoheight-min") ? Number(textarea.dataset.autoheightMin) : Number(textarea.offsetHeight);
+                    const maxHeight = textarea.hasAttribute("data-autoheight-max") ? Number(textarea.dataset.autoheightMax) : 1 / 0;
+                    setHeight(textarea, Math.min(startHeight, maxHeight));
+                    textarea.addEventListener("input", (() => {
+                        if (textarea.scrollHeight > startHeight) {
+                            textarea.style.height = `auto`;
+                            setHeight(textarea, Math.min(Math.max(textarea.scrollHeight, startHeight), maxHeight));
+                        }
+                    }));
+                }));
+                function setHeight(textarea, height) {
+                    textarea.style.height = `${height}px`;
+                }
+            }
+        }
+    }
+    let formValidate = {
+        getErrors(form) {
+            let error = 0;
+            let formRequiredItems = form.querySelectorAll("*[data-required]");
+            if (formRequiredItems.length) formRequiredItems.forEach((formRequiredItem => {
+                if ((null !== formRequiredItem.offsetParent || "SELECT" === formRequiredItem.tagName) && !formRequiredItem.disabled) error += this.validateInput(formRequiredItem);
+            }));
+            return error;
+        },
+        validateInput(formRequiredItem) {
+            let error = 0;
+            if ("email" === formRequiredItem.dataset.required) {
+                formRequiredItem.value = formRequiredItem.value.replace(" ", "");
+                if (this.emailTest(formRequiredItem)) {
+                    this.addError(formRequiredItem);
+                    error++;
+                } else this.removeError(formRequiredItem);
+            } else if ("checkbox" === formRequiredItem.type && !formRequiredItem.checked) {
+                this.addError(formRequiredItem);
+                error++;
+            } else if (!formRequiredItem.value.trim()) {
+                this.addError(formRequiredItem);
+                error++;
+            } else this.removeError(formRequiredItem);
+            return error;
+        },
+        addError(formRequiredItem) {
+            formRequiredItem.classList.add("_form-error");
+            formRequiredItem.parentElement.classList.add("_form-error");
+            let inputError = formRequiredItem.parentElement.querySelector(".form__error");
+            if (inputError) formRequiredItem.parentElement.removeChild(inputError);
+            if (formRequiredItem.dataset.error) formRequiredItem.parentElement.insertAdjacentHTML("beforeend", `<div class="form__error">${formRequiredItem.dataset.error}</div>`);
+        },
+        removeError(formRequiredItem) {
+            formRequiredItem.classList.remove("_form-error");
+            formRequiredItem.parentElement.classList.remove("_form-error");
+            if (formRequiredItem.parentElement.querySelector(".form__error")) formRequiredItem.parentElement.removeChild(formRequiredItem.parentElement.querySelector(".form__error"));
+        },
+        formClean(form) {
+            form.reset();
+            setTimeout((() => {
+                let inputs = form.querySelectorAll("input,textarea");
+                for (let index = 0; index < inputs.length; index++) {
+                    const el = inputs[index];
+                    el.parentElement.classList.remove("_form-focus");
+                    el.classList.remove("_form-focus");
+                    formValidate.removeError(el);
+                }
+                let checkboxes = form.querySelectorAll(".checkbox__input");
+                if (checkboxes.length > 0) for (let index = 0; index < checkboxes.length; index++) {
+                    const checkbox = checkboxes[index];
+                    checkbox.checked = false;
+                }
+                if (flsModules.select) {
+                    let selects = form.querySelectorAll(".select");
+                    if (selects.length) for (let index = 0; index < selects.length; index++) {
+                        const select = selects[index].querySelector("select");
+                        flsModules.select.selectBuild(select);
+                    }
+                }
+            }), 0);
+        },
+        emailTest(formRequiredItem) {
+            return !/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,8})+$/.test(formRequiredItem.value);
+        }
+    };
+    function formSubmit() {
+        const forms = document.forms;
+        if (forms.length) for (const form of forms) {
+            form.addEventListener("submit", (function(e) {
+                const form = e.target;
+                formSubmitAction(form, e);
+            }));
+            form.addEventListener("reset", (function(e) {
+                const form = e.target;
+                formValidate.formClean(form);
+            }));
+        }
+        async function formSubmitAction(form, e) {
+            const error = !form.hasAttribute("data-no-validate") ? formValidate.getErrors(form) : 0;
+            if (0 === error) {
+                const ajax = form.hasAttribute("data-ajax");
+                if (ajax) {
+                    e.preventDefault();
+                    const formAction = form.getAttribute("action") ? form.getAttribute("action").trim() : "#";
+                    const formMethod = form.getAttribute("method") ? form.getAttribute("method").trim() : "GET";
+                    const formData = new FormData(form);
+                    form.classList.add("_sending");
+                    const response = await fetch(formAction, {
+                        method: formMethod,
+                        body: formData
+                    });
+                    if (response.ok) {
+                        let responseResult = await response.json();
+                        form.classList.remove("_sending");
+                        formSent(form, responseResult);
+                    } else {
+                        alert("Ошибка");
+                        form.classList.remove("_sending");
+                    }
+                } else if (form.hasAttribute("data-dev")) {
+                    e.preventDefault();
+                    formSent(form);
+                }
+            } else {
+                e.preventDefault();
+                if (form.querySelector("._form-error") && form.hasAttribute("data-goto-error")) {
+                    const formGoToErrorClass = form.dataset.gotoError ? form.dataset.gotoError : "._form-error";
+                    gotoBlock(formGoToErrorClass, true, 1e3);
+                }
+            }
+        }
+        function formSent(form, responseResult = ``) {
+            document.dispatchEvent(new CustomEvent("formSent", {
+                detail: {
+                    form
+                }
+            }));
+            setTimeout((() => {
+                if (flsModules.popup) {
+                    const popup = form.dataset.popupMessage;
+                    popup ? flsModules.popup.open(popup) : null;
+                }
+            }), 0);
+            formValidate.formClean(form);
+            formLogging(`Форма отправлена!`);
+        }
+        function formLogging(message) {
+            FLS(`[Формы]: ${message}`);
+        }
     }
     function ssr_window_esm_isObject(obj) {
         return null !== obj && "object" === typeof obj && "constructor" in obj && obj.constructor === Object;
@@ -3023,272 +3493,132 @@
         }));
         return params;
     }
-    function classes_to_selector_classesToSelector(classes = "") {
-        return `.${classes.trim().replace(/([\.:!\/])/g, "\\$1").replace(/ /g, ".")}`;
-    }
-    function Pagination({swiper, extendParams, on, emit}) {
-        const pfx = "swiper-pagination";
+    function Navigation({swiper, extendParams, on, emit}) {
         extendParams({
-            pagination: {
-                el: null,
-                bulletElement: "span",
-                clickable: false,
+            navigation: {
+                nextEl: null,
+                prevEl: null,
                 hideOnClick: false,
-                renderBullet: null,
-                renderProgressbar: null,
-                renderFraction: null,
-                renderCustom: null,
-                progressbarOpposite: false,
-                type: "bullets",
-                dynamicBullets: false,
-                dynamicMainBullets: 1,
-                formatFractionCurrent: number => number,
-                formatFractionTotal: number => number,
-                bulletClass: `${pfx}-bullet`,
-                bulletActiveClass: `${pfx}-bullet-active`,
-                modifierClass: `${pfx}-`,
-                currentClass: `${pfx}-current`,
-                totalClass: `${pfx}-total`,
-                hiddenClass: `${pfx}-hidden`,
-                progressbarFillClass: `${pfx}-progressbar-fill`,
-                progressbarOppositeClass: `${pfx}-progressbar-opposite`,
-                clickableClass: `${pfx}-clickable`,
-                lockClass: `${pfx}-lock`,
-                horizontalClass: `${pfx}-horizontal`,
-                verticalClass: `${pfx}-vertical`,
-                paginationDisabledClass: `${pfx}-disabled`
+                disabledClass: "swiper-button-disabled",
+                hiddenClass: "swiper-button-hidden",
+                lockClass: "swiper-button-lock",
+                navigationDisabledClass: "swiper-navigation-disabled"
             }
         });
-        swiper.pagination = {
-            el: null,
-            $el: null,
-            bullets: []
+        swiper.navigation = {
+            nextEl: null,
+            $nextEl: null,
+            prevEl: null,
+            $prevEl: null
         };
-        let bulletSize;
-        let dynamicBulletIndex = 0;
-        function isPaginationDisabled() {
-            return !swiper.params.pagination.el || !swiper.pagination.el || !swiper.pagination.$el || 0 === swiper.pagination.$el.length;
+        function getEl(el) {
+            let $el;
+            if (el) {
+                $el = dom(el);
+                if (swiper.params.uniqueNavElements && "string" === typeof el && $el.length > 1 && 1 === swiper.$el.find(el).length) $el = swiper.$el.find(el);
+            }
+            return $el;
         }
-        function setSideBullets($bulletEl, position) {
-            const {bulletActiveClass} = swiper.params.pagination;
-            $bulletEl[position]().addClass(`${bulletActiveClass}-${position}`)[position]().addClass(`${bulletActiveClass}-${position}-${position}`);
+        function toggleEl($el, disabled) {
+            const params = swiper.params.navigation;
+            if ($el && $el.length > 0) {
+                $el[disabled ? "addClass" : "removeClass"](params.disabledClass);
+                if ($el[0] && "BUTTON" === $el[0].tagName) $el[0].disabled = disabled;
+                if (swiper.params.watchOverflow && swiper.enabled) $el[swiper.isLocked ? "addClass" : "removeClass"](params.lockClass);
+            }
         }
         function update() {
-            const rtl = swiper.rtl;
-            const params = swiper.params.pagination;
-            if (isPaginationDisabled()) return;
-            const slidesLength = swiper.virtual && swiper.params.virtual.enabled ? swiper.virtual.slides.length : swiper.slides.length;
-            const $el = swiper.pagination.$el;
-            let current;
-            const total = swiper.params.loop ? Math.ceil((slidesLength - 2 * swiper.loopedSlides) / swiper.params.slidesPerGroup) : swiper.snapGrid.length;
-            if (swiper.params.loop) {
-                current = Math.ceil((swiper.activeIndex - swiper.loopedSlides) / swiper.params.slidesPerGroup);
-                if (current > slidesLength - 1 - 2 * swiper.loopedSlides) current -= slidesLength - 2 * swiper.loopedSlides;
-                if (current > total - 1) current -= total;
-                if (current < 0 && "bullets" !== swiper.params.paginationType) current = total + current;
-            } else if ("undefined" !== typeof swiper.snapIndex) current = swiper.snapIndex; else current = swiper.activeIndex || 0;
-            if ("bullets" === params.type && swiper.pagination.bullets && swiper.pagination.bullets.length > 0) {
-                const bullets = swiper.pagination.bullets;
-                let firstIndex;
-                let lastIndex;
-                let midIndex;
-                if (params.dynamicBullets) {
-                    bulletSize = bullets.eq(0)[swiper.isHorizontal() ? "outerWidth" : "outerHeight"](true);
-                    $el.css(swiper.isHorizontal() ? "width" : "height", `${bulletSize * (params.dynamicMainBullets + 4)}px`);
-                    if (params.dynamicMainBullets > 1 && void 0 !== swiper.previousIndex) {
-                        dynamicBulletIndex += current - (swiper.previousIndex - swiper.loopedSlides || 0);
-                        if (dynamicBulletIndex > params.dynamicMainBullets - 1) dynamicBulletIndex = params.dynamicMainBullets - 1; else if (dynamicBulletIndex < 0) dynamicBulletIndex = 0;
-                    }
-                    firstIndex = Math.max(current - dynamicBulletIndex, 0);
-                    lastIndex = firstIndex + (Math.min(bullets.length, params.dynamicMainBullets) - 1);
-                    midIndex = (lastIndex + firstIndex) / 2;
-                }
-                bullets.removeClass([ "", "-next", "-next-next", "-prev", "-prev-prev", "-main" ].map((suffix => `${params.bulletActiveClass}${suffix}`)).join(" "));
-                if ($el.length > 1) bullets.each((bullet => {
-                    const $bullet = dom(bullet);
-                    const bulletIndex = $bullet.index();
-                    if (bulletIndex === current) $bullet.addClass(params.bulletActiveClass);
-                    if (params.dynamicBullets) {
-                        if (bulletIndex >= firstIndex && bulletIndex <= lastIndex) $bullet.addClass(`${params.bulletActiveClass}-main`);
-                        if (bulletIndex === firstIndex) setSideBullets($bullet, "prev");
-                        if (bulletIndex === lastIndex) setSideBullets($bullet, "next");
-                    }
-                })); else {
-                    const $bullet = bullets.eq(current);
-                    const bulletIndex = $bullet.index();
-                    $bullet.addClass(params.bulletActiveClass);
-                    if (params.dynamicBullets) {
-                        const $firstDisplayedBullet = bullets.eq(firstIndex);
-                        const $lastDisplayedBullet = bullets.eq(lastIndex);
-                        for (let i = firstIndex; i <= lastIndex; i += 1) bullets.eq(i).addClass(`${params.bulletActiveClass}-main`);
-                        if (swiper.params.loop) if (bulletIndex >= bullets.length) {
-                            for (let i = params.dynamicMainBullets; i >= 0; i -= 1) bullets.eq(bullets.length - i).addClass(`${params.bulletActiveClass}-main`);
-                            bullets.eq(bullets.length - params.dynamicMainBullets - 1).addClass(`${params.bulletActiveClass}-prev`);
-                        } else {
-                            setSideBullets($firstDisplayedBullet, "prev");
-                            setSideBullets($lastDisplayedBullet, "next");
-                        } else {
-                            setSideBullets($firstDisplayedBullet, "prev");
-                            setSideBullets($lastDisplayedBullet, "next");
-                        }
-                    }
-                }
-                if (params.dynamicBullets) {
-                    const dynamicBulletsLength = Math.min(bullets.length, params.dynamicMainBullets + 4);
-                    const bulletsOffset = (bulletSize * dynamicBulletsLength - bulletSize) / 2 - midIndex * bulletSize;
-                    const offsetProp = rtl ? "right" : "left";
-                    bullets.css(swiper.isHorizontal() ? offsetProp : "top", `${bulletsOffset}px`);
-                }
-            }
-            if ("fraction" === params.type) {
-                $el.find(classes_to_selector_classesToSelector(params.currentClass)).text(params.formatFractionCurrent(current + 1));
-                $el.find(classes_to_selector_classesToSelector(params.totalClass)).text(params.formatFractionTotal(total));
-            }
-            if ("progressbar" === params.type) {
-                let progressbarDirection;
-                if (params.progressbarOpposite) progressbarDirection = swiper.isHorizontal() ? "vertical" : "horizontal"; else progressbarDirection = swiper.isHorizontal() ? "horizontal" : "vertical";
-                const scale = (current + 1) / total;
-                let scaleX = 1;
-                let scaleY = 1;
-                if ("horizontal" === progressbarDirection) scaleX = scale; else scaleY = scale;
-                $el.find(classes_to_selector_classesToSelector(params.progressbarFillClass)).transform(`translate3d(0,0,0) scaleX(${scaleX}) scaleY(${scaleY})`).transition(swiper.params.speed);
-            }
-            if ("custom" === params.type && params.renderCustom) {
-                $el.html(params.renderCustom(swiper, current + 1, total));
-                emit("paginationRender", $el[0]);
-            } else emit("paginationUpdate", $el[0]);
-            if (swiper.params.watchOverflow && swiper.enabled) $el[swiper.isLocked ? "addClass" : "removeClass"](params.lockClass);
+            if (swiper.params.loop) return;
+            const {$nextEl, $prevEl} = swiper.navigation;
+            toggleEl($prevEl, swiper.isBeginning && !swiper.params.rewind);
+            toggleEl($nextEl, swiper.isEnd && !swiper.params.rewind);
         }
-        function render() {
-            const params = swiper.params.pagination;
-            if (isPaginationDisabled()) return;
-            const slidesLength = swiper.virtual && swiper.params.virtual.enabled ? swiper.virtual.slides.length : swiper.slides.length;
-            const $el = swiper.pagination.$el;
-            let paginationHTML = "";
-            if ("bullets" === params.type) {
-                let numberOfBullets = swiper.params.loop ? Math.ceil((slidesLength - 2 * swiper.loopedSlides) / swiper.params.slidesPerGroup) : swiper.snapGrid.length;
-                if (swiper.params.freeMode && swiper.params.freeMode.enabled && !swiper.params.loop && numberOfBullets > slidesLength) numberOfBullets = slidesLength;
-                for (let i = 0; i < numberOfBullets; i += 1) if (params.renderBullet) paginationHTML += params.renderBullet.call(swiper, i, params.bulletClass); else paginationHTML += `<${params.bulletElement} class="${params.bulletClass}"></${params.bulletElement}>`;
-                $el.html(paginationHTML);
-                swiper.pagination.bullets = $el.find(classes_to_selector_classesToSelector(params.bulletClass));
-            }
-            if ("fraction" === params.type) {
-                if (params.renderFraction) paginationHTML = params.renderFraction.call(swiper, params.currentClass, params.totalClass); else paginationHTML = `<span class="${params.currentClass}"></span>` + " / " + `<span class="${params.totalClass}"></span>`;
-                $el.html(paginationHTML);
-            }
-            if ("progressbar" === params.type) {
-                if (params.renderProgressbar) paginationHTML = params.renderProgressbar.call(swiper, params.progressbarFillClass); else paginationHTML = `<span class="${params.progressbarFillClass}"></span>`;
-                $el.html(paginationHTML);
-            }
-            if ("custom" !== params.type) emit("paginationRender", swiper.pagination.$el[0]);
+        function onPrevClick(e) {
+            e.preventDefault();
+            if (swiper.isBeginning && !swiper.params.loop && !swiper.params.rewind) return;
+            swiper.slidePrev();
+            emit("navigationPrev");
+        }
+        function onNextClick(e) {
+            e.preventDefault();
+            if (swiper.isEnd && !swiper.params.loop && !swiper.params.rewind) return;
+            swiper.slideNext();
+            emit("navigationNext");
         }
         function init() {
-            swiper.params.pagination = create_element_if_not_defined_createElementIfNotDefined(swiper, swiper.originalParams.pagination, swiper.params.pagination, {
-                el: "swiper-pagination"
+            const params = swiper.params.navigation;
+            swiper.params.navigation = create_element_if_not_defined_createElementIfNotDefined(swiper, swiper.originalParams.navigation, swiper.params.navigation, {
+                nextEl: "swiper-button-next",
+                prevEl: "swiper-button-prev"
             });
-            const params = swiper.params.pagination;
-            if (!params.el) return;
-            let $el = dom(params.el);
-            if (0 === $el.length) return;
-            if (swiper.params.uniqueNavElements && "string" === typeof params.el && $el.length > 1) {
-                $el = swiper.$el.find(params.el);
-                if ($el.length > 1) $el = $el.filter((el => {
-                    if (dom(el).parents(".swiper")[0] !== swiper.el) return false;
-                    return true;
-                }));
-            }
-            if ("bullets" === params.type && params.clickable) $el.addClass(params.clickableClass);
-            $el.addClass(params.modifierClass + params.type);
-            $el.addClass(swiper.isHorizontal() ? params.horizontalClass : params.verticalClass);
-            if ("bullets" === params.type && params.dynamicBullets) {
-                $el.addClass(`${params.modifierClass}${params.type}-dynamic`);
-                dynamicBulletIndex = 0;
-                if (params.dynamicMainBullets < 1) params.dynamicMainBullets = 1;
-            }
-            if ("progressbar" === params.type && params.progressbarOpposite) $el.addClass(params.progressbarOppositeClass);
-            if (params.clickable) $el.on("click", classes_to_selector_classesToSelector(params.bulletClass), (function onClick(e) {
-                e.preventDefault();
-                let index = dom(this).index() * swiper.params.slidesPerGroup;
-                if (swiper.params.loop) index += swiper.loopedSlides;
-                swiper.slideTo(index);
-            }));
-            Object.assign(swiper.pagination, {
-                $el,
-                el: $el[0]
+            if (!(params.nextEl || params.prevEl)) return;
+            const $nextEl = getEl(params.nextEl);
+            const $prevEl = getEl(params.prevEl);
+            if ($nextEl && $nextEl.length > 0) $nextEl.on("click", onNextClick);
+            if ($prevEl && $prevEl.length > 0) $prevEl.on("click", onPrevClick);
+            Object.assign(swiper.navigation, {
+                $nextEl,
+                nextEl: $nextEl && $nextEl[0],
+                $prevEl,
+                prevEl: $prevEl && $prevEl[0]
             });
-            if (!swiper.enabled) $el.addClass(params.lockClass);
+            if (!swiper.enabled) {
+                if ($nextEl) $nextEl.addClass(params.lockClass);
+                if ($prevEl) $prevEl.addClass(params.lockClass);
+            }
         }
         function destroy() {
-            const params = swiper.params.pagination;
-            if (isPaginationDisabled()) return;
-            const $el = swiper.pagination.$el;
-            $el.removeClass(params.hiddenClass);
-            $el.removeClass(params.modifierClass + params.type);
-            $el.removeClass(swiper.isHorizontal() ? params.horizontalClass : params.verticalClass);
-            if (swiper.pagination.bullets && swiper.pagination.bullets.removeClass) swiper.pagination.bullets.removeClass(params.bulletActiveClass);
-            if (params.clickable) $el.off("click", classes_to_selector_classesToSelector(params.bulletClass));
+            const {$nextEl, $prevEl} = swiper.navigation;
+            if ($nextEl && $nextEl.length) {
+                $nextEl.off("click", onNextClick);
+                $nextEl.removeClass(swiper.params.navigation.disabledClass);
+            }
+            if ($prevEl && $prevEl.length) {
+                $prevEl.off("click", onPrevClick);
+                $prevEl.removeClass(swiper.params.navigation.disabledClass);
+            }
         }
         on("init", (() => {
-            if (false === swiper.params.pagination.enabled) disable(); else {
+            if (false === swiper.params.navigation.enabled) disable(); else {
                 init();
-                render();
                 update();
             }
         }));
-        on("activeIndexChange", (() => {
-            if (swiper.params.loop) update(); else if ("undefined" === typeof swiper.snapIndex) update();
-        }));
-        on("snapIndexChange", (() => {
-            if (!swiper.params.loop) update();
-        }));
-        on("slidesLengthChange", (() => {
-            if (swiper.params.loop) {
-                render();
-                update();
-            }
-        }));
-        on("snapGridLengthChange", (() => {
-            if (!swiper.params.loop) {
-                render();
-                update();
-            }
+        on("toEdge fromEdge lock unlock", (() => {
+            update();
         }));
         on("destroy", (() => {
             destroy();
         }));
         on("enable disable", (() => {
-            const {$el} = swiper.pagination;
-            if ($el) $el[swiper.enabled ? "removeClass" : "addClass"](swiper.params.pagination.lockClass);
-        }));
-        on("lock unlock", (() => {
-            update();
+            const {$nextEl, $prevEl} = swiper.navigation;
+            if ($nextEl) $nextEl[swiper.enabled ? "removeClass" : "addClass"](swiper.params.navigation.lockClass);
+            if ($prevEl) $prevEl[swiper.enabled ? "removeClass" : "addClass"](swiper.params.navigation.lockClass);
         }));
         on("click", ((_s, e) => {
+            const {$nextEl, $prevEl} = swiper.navigation;
             const targetEl = e.target;
-            const {$el} = swiper.pagination;
-            if (swiper.params.pagination.el && swiper.params.pagination.hideOnClick && $el && $el.length > 0 && !dom(targetEl).hasClass(swiper.params.pagination.bulletClass)) {
-                if (swiper.navigation && (swiper.navigation.nextEl && targetEl === swiper.navigation.nextEl || swiper.navigation.prevEl && targetEl === swiper.navigation.prevEl)) return;
-                const isHidden = $el.hasClass(swiper.params.pagination.hiddenClass);
-                if (true === isHidden) emit("paginationShow"); else emit("paginationHide");
-                $el.toggleClass(swiper.params.pagination.hiddenClass);
+            if (swiper.params.navigation.hideOnClick && !dom(targetEl).is($prevEl) && !dom(targetEl).is($nextEl)) {
+                if (swiper.pagination && swiper.params.pagination && swiper.params.pagination.clickable && (swiper.pagination.el === targetEl || swiper.pagination.el.contains(targetEl))) return;
+                let isHidden;
+                if ($nextEl) isHidden = $nextEl.hasClass(swiper.params.navigation.hiddenClass); else if ($prevEl) isHidden = $prevEl.hasClass(swiper.params.navigation.hiddenClass);
+                if (true === isHidden) emit("navigationShow"); else emit("navigationHide");
+                if ($nextEl) $nextEl.toggleClass(swiper.params.navigation.hiddenClass);
+                if ($prevEl) $prevEl.toggleClass(swiper.params.navigation.hiddenClass);
             }
         }));
         const enable = () => {
-            swiper.$el.removeClass(swiper.params.pagination.paginationDisabledClass);
-            if (swiper.pagination.$el) swiper.pagination.$el.removeClass(swiper.params.pagination.paginationDisabledClass);
+            swiper.$el.removeClass(swiper.params.navigation.navigationDisabledClass);
             init();
-            render();
             update();
         };
         const disable = () => {
-            swiper.$el.addClass(swiper.params.pagination.paginationDisabledClass);
-            if (swiper.pagination.$el) swiper.pagination.$el.addClass(swiper.params.pagination.paginationDisabledClass);
+            swiper.$el.addClass(swiper.params.navigation.navigationDisabledClass);
             destroy();
         };
-        Object.assign(swiper.pagination, {
+        Object.assign(swiper.navigation, {
             enable,
             disable,
-            render,
             update,
             init,
             destroy
@@ -3296,34 +3626,34 @@
     }
     function initSliders() {
         if (document.querySelector(".swiper")) new core(".swiper", {
-            modules: [ Pagination ],
+            modules: [ Navigation ],
             observer: true,
             observeParents: true,
             slidesPerView: 3,
-            spaceBetween: 100,
-            autoHeight: false,
+            spaceBetween: 55,
             speed: 800,
-            pagination: {
-                el: ".swiper-pagination",
-                clickable: true
-            },
             navigation: {
-                prevEl: ".swiper-button-prev",
-                nextEl: ".swiper-button-next"
+                prevEl: ".portfolio__arrow_left",
+                nextEl: ".portfolio__arrow_right"
             },
             breakpoints: {
                 320: {
-                    slidesPerView: 1,
+                    slidesPerView: 1.1,
+                    spaceBetween: 5,
+                    autoHeight: true
+                },
+                550: {
+                    slidesPerView: 2,
                     spaceBetween: 20,
                     autoHeight: true
                 },
-                480: {
-                    slidesPerView: 2,
+                992: {
+                    slidesPerView: 3,
                     spaceBetween: 30
                 },
-                1e3: {
+                1200: {
                     slidesPerView: 3,
-                    spaceBetween: 50
+                    spaceBetween: 55
                 }
             },
             on: {}
@@ -3332,7 +3662,498 @@
     window.addEventListener("load", (function(e) {
         initSliders();
     }));
+    class ScrollWatcher {
+        constructor(props) {
+            let defaultConfig = {
+                logging: true
+            };
+            this.config = Object.assign(defaultConfig, props);
+            this.observer;
+            !document.documentElement.classList.contains("watcher") ? this.scrollWatcherRun() : null;
+        }
+        scrollWatcherUpdate() {
+            this.scrollWatcherRun();
+        }
+        scrollWatcherRun() {
+            document.documentElement.classList.add("watcher");
+            this.scrollWatcherConstructor(document.querySelectorAll("[data-watch]"));
+        }
+        scrollWatcherConstructor(items) {
+            if (items.length) {
+                this.scrollWatcherLogging(`Проснулся, слежу за объектами (${items.length})...`);
+                let uniqParams = uniqArray(Array.from(items).map((function(item) {
+                    return `${item.dataset.watchRoot ? item.dataset.watchRoot : null}|${item.dataset.watchMargin ? item.dataset.watchMargin : "0px"}|${item.dataset.watchThreshold ? item.dataset.watchThreshold : 0}`;
+                })));
+                uniqParams.forEach((uniqParam => {
+                    let uniqParamArray = uniqParam.split("|");
+                    let paramsWatch = {
+                        root: uniqParamArray[0],
+                        margin: uniqParamArray[1],
+                        threshold: uniqParamArray[2]
+                    };
+                    let groupItems = Array.from(items).filter((function(item) {
+                        let watchRoot = item.dataset.watchRoot ? item.dataset.watchRoot : null;
+                        let watchMargin = item.dataset.watchMargin ? item.dataset.watchMargin : "0px";
+                        let watchThreshold = item.dataset.watchThreshold ? item.dataset.watchThreshold : 0;
+                        if (String(watchRoot) === paramsWatch.root && String(watchMargin) === paramsWatch.margin && String(watchThreshold) === paramsWatch.threshold) return item;
+                    }));
+                    let configWatcher = this.getScrollWatcherConfig(paramsWatch);
+                    this.scrollWatcherInit(groupItems, configWatcher);
+                }));
+            } else this.scrollWatcherLogging("Сплю, нет объектов для слежения. ZzzZZzz");
+        }
+        getScrollWatcherConfig(paramsWatch) {
+            let configWatcher = {};
+            if (document.querySelector(paramsWatch.root)) configWatcher.root = document.querySelector(paramsWatch.root); else if ("null" !== paramsWatch.root) this.scrollWatcherLogging(`Эмм... родительского объекта ${paramsWatch.root} нет на странице`);
+            configWatcher.rootMargin = paramsWatch.margin;
+            if (paramsWatch.margin.indexOf("px") < 0 && paramsWatch.margin.indexOf("%") < 0) {
+                this.scrollWatcherLogging(`Ой ой, настройку data-watch-margin нужно задавать в PX или %`);
+                return;
+            }
+            if ("prx" === paramsWatch.threshold) {
+                paramsWatch.threshold = [];
+                for (let i = 0; i <= 1; i += .005) paramsWatch.threshold.push(i);
+            } else paramsWatch.threshold = paramsWatch.threshold.split(",");
+            configWatcher.threshold = paramsWatch.threshold;
+            return configWatcher;
+        }
+        scrollWatcherCreate(configWatcher) {
+            this.observer = new IntersectionObserver(((entries, observer) => {
+                entries.forEach((entry => {
+                    this.scrollWatcherCallback(entry, observer);
+                }));
+            }), configWatcher);
+        }
+        scrollWatcherInit(items, configWatcher) {
+            this.scrollWatcherCreate(configWatcher);
+            items.forEach((item => this.observer.observe(item)));
+        }
+        scrollWatcherIntersecting(entry, targetElement) {
+            if (entry.isIntersecting) {
+                !targetElement.classList.contains("_watcher-view") ? targetElement.classList.add("_watcher-view") : null;
+                this.scrollWatcherLogging(`Я вижу ${targetElement.classList}, добавил класс _watcher-view`);
+            } else {
+                targetElement.classList.contains("_watcher-view") ? targetElement.classList.remove("_watcher-view") : null;
+                this.scrollWatcherLogging(`Я не вижу ${targetElement.classList}, убрал класс _watcher-view`);
+            }
+        }
+        scrollWatcherOff(targetElement, observer) {
+            observer.unobserve(targetElement);
+            this.scrollWatcherLogging(`Я перестал следить за ${targetElement.classList}`);
+        }
+        scrollWatcherLogging(message) {
+            this.config.logging ? FLS(`[Наблюдатель]: ${message}`) : null;
+        }
+        scrollWatcherCallback(entry, observer) {
+            const targetElement = entry.target;
+            this.scrollWatcherIntersecting(entry, targetElement);
+            targetElement.hasAttribute("data-watch-once") && entry.isIntersecting ? this.scrollWatcherOff(targetElement, observer) : null;
+            document.dispatchEvent(new CustomEvent("watcherCallback", {
+                detail: {
+                    entry
+                }
+            }));
+        }
+    }
+    flsModules.watcher = new ScrollWatcher({});
+    class FullPage {
+        constructor(element, options) {
+            let config = {
+                noEventSelector: "[data-no-event]",
+                сlassInit: "fp-init",
+                wrapperAnimatedClass: "fp-switching",
+                selectorSection: "[data-fp-section]",
+                activeClass: "active-section",
+                previousClass: "previous-section",
+                nextClass: "next-section",
+                idActiveSection: 0,
+                mode: element.dataset.fpEffect ? element.dataset.fpEffect : "slider",
+                bullets: element.hasAttribute("data-fp-bullets") ? true : false,
+                bulletsClass: "fp-bullets",
+                bulletClass: "fp-bullet",
+                bulletActiveClass: "fp-bullet-active",
+                onInit: function() {},
+                onSwitching: function() {},
+                onDestroy: function() {}
+            };
+            this.options = Object.assign(config, options);
+            this.wrapper = element;
+            this.sections = this.wrapper.querySelectorAll(this.options.selectorSection);
+            this.activeSection = false;
+            this.activeSectionId = false;
+            this.previousSection = false;
+            this.previousSectionId = false;
+            this.nextSection = false;
+            this.nextSectionId = false;
+            this.bulletsWrapper = false;
+            this.stopEvent = false;
+            if (this.sections.length) this.init();
+        }
+        init() {
+            if (this.options.idActiveSection > this.sections.length - 1) return;
+            this.setId();
+            this.activeSectionId = this.options.idActiveSection;
+            this.setEffectsClasses();
+            this.setClasses();
+            this.setStyle();
+            if (this.options.bullets) {
+                this.setBullets();
+                this.setActiveBullet(this.activeSectionId);
+            }
+            this.events();
+            setTimeout((() => {
+                document.documentElement.classList.add(this.options.сlassInit);
+                this.options.onInit(this);
+                document.dispatchEvent(new CustomEvent("fpinit", {
+                    detail: {
+                        fp: this
+                    }
+                }));
+            }), 0);
+        }
+        destroy() {
+            this.removeEvents();
+            this.removeClasses();
+            document.documentElement.classList.remove(this.options.сlassInit);
+            this.wrapper.classList.remove(this.options.wrapperAnimatedClass);
+            this.removeEffectsClasses();
+            this.removeZIndex();
+            this.removeStyle();
+            this.removeId();
+            this.options.onDestroy(this);
+            document.dispatchEvent(new CustomEvent("fpdestroy", {
+                detail: {
+                    fp: this
+                }
+            }));
+        }
+        setId() {
+            for (let index = 0; index < this.sections.length; index++) {
+                const section = this.sections[index];
+                section.setAttribute("data-fp-id", index);
+            }
+        }
+        removeId() {
+            for (let index = 0; index < this.sections.length; index++) {
+                const section = this.sections[index];
+                section.removeAttribute("data-fp-id");
+            }
+        }
+        setClasses() {
+            this.previousSectionId = this.activeSectionId - 1 >= 0 ? this.activeSectionId - 1 : false;
+            this.nextSectionId = this.activeSectionId + 1 < this.sections.length ? this.activeSectionId + 1 : false;
+            this.activeSection = this.sections[this.activeSectionId];
+            this.activeSection.classList.add(this.options.activeClass);
+            if (false !== this.previousSectionId) {
+                this.previousSection = this.sections[this.previousSectionId];
+                this.previousSection.classList.add(this.options.previousClass);
+            } else this.previousSection = false;
+            if (false !== this.nextSectionId) {
+                this.nextSection = this.sections[this.nextSectionId];
+                this.nextSection.classList.add(this.options.nextClass);
+            } else this.nextSection = false;
+        }
+        removeEffectsClasses() {
+            switch (this.options.mode) {
+              case "slider":
+                this.wrapper.classList.remove("slider-mode");
+                break;
+
+              case "cards":
+                this.wrapper.classList.remove("cards-mode");
+                this.setZIndex();
+                break;
+
+              case "fade":
+                this.wrapper.classList.remove("fade-mode");
+                this.setZIndex();
+                break;
+
+              default:
+                break;
+            }
+        }
+        setEffectsClasses() {
+            switch (this.options.mode) {
+              case "slider":
+                this.wrapper.classList.add("slider-mode");
+                break;
+
+              case "cards":
+                this.wrapper.classList.add("cards-mode");
+                this.setZIndex();
+                break;
+
+              case "fade":
+                this.wrapper.classList.add("fade-mode");
+                this.setZIndex();
+                break;
+
+              default:
+                break;
+            }
+        }
+        setStyle() {
+            switch (this.options.mode) {
+              case "slider":
+                this.styleSlider();
+                break;
+
+              case "cards":
+                this.styleCards();
+                break;
+
+              case "fade":
+                this.styleFade();
+                break;
+
+              default:
+                break;
+            }
+        }
+        styleSlider() {
+            for (let index = 0; index < this.sections.length; index++) {
+                const section = this.sections[index];
+                if (index === this.activeSectionId) section.style.transform = "translate3D(0,0,0)"; else if (index < this.activeSectionId) section.style.transform = "translate3D(0,-100%,0)"; else if (index > this.activeSectionId) section.style.transform = "translate3D(0,100%,0)";
+            }
+        }
+        styleCards() {
+            for (let index = 0; index < this.sections.length; index++) {
+                const section = this.sections[index];
+                if (index >= this.activeSectionId) section.style.transform = "translate3D(0,0,0)"; else if (index < this.activeSectionId) section.style.transform = "translate3D(0,-100%,0)";
+            }
+        }
+        styleFade() {
+            for (let index = 0; index < this.sections.length; index++) {
+                const section = this.sections[index];
+                if (index === this.activeSectionId) {
+                    section.style.opacity = "1";
+                    section.style.visibility = "visible";
+                } else {
+                    section.style.opacity = "0";
+                    section.style.visibility = "hidden";
+                }
+            }
+        }
+        removeStyle() {
+            for (let index = 0; index < this.sections.length; index++) {
+                const section = this.sections[index];
+                section.style.opacity = "";
+                section.style.visibility = "";
+                section.style.transform = "";
+            }
+        }
+        checkScroll(yCoord, element) {
+            this.goScroll = false;
+            if (!this.stopEvent && element) {
+                this.goScroll = true;
+                if (this.haveScroll(element)) {
+                    this.goScroll = false;
+                    const position = Math.round(element.scrollHeight - element.scrollTop);
+                    if (Math.abs(position - element.scrollHeight) < 2 && yCoord <= 0 || Math.abs(position - element.clientHeight) < 2 && yCoord >= 0) this.goScroll = true;
+                }
+            }
+        }
+        haveScroll(element) {
+            return element.scrollHeight !== window.innerHeight;
+        }
+        removeClasses() {
+            for (let index = 0; index < this.sections.length; index++) {
+                const section = this.sections[index];
+                section.classList.remove(this.options.activeClass);
+                section.classList.remove(this.options.previousClass);
+                section.classList.remove(this.options.nextClass);
+            }
+        }
+        events() {
+            this.events = {
+                wheel: this.wheel.bind(this),
+                touchdown: this.touchDown.bind(this),
+                touchup: this.touchUp.bind(this),
+                touchmove: this.touchMove.bind(this),
+                touchcancel: this.touchUp.bind(this),
+                transitionEnd: this.transitionend.bind(this),
+                click: this.clickBullets.bind(this)
+            };
+            if (isMobile.iOS()) document.addEventListener("touchmove", (e => {
+                e.preventDefault();
+            }));
+            this.setEvents();
+        }
+        setEvents() {
+            this.wrapper.addEventListener("wheel", this.events.wheel);
+            this.wrapper.addEventListener("touchstart", this.events.touchdown);
+            if (this.options.bullets && this.bulletsWrapper) this.bulletsWrapper.addEventListener("click", this.events.click);
+        }
+        removeEvents() {
+            this.wrapper.removeEventListener("wheel", this.events.wheel);
+            this.wrapper.removeEventListener("touchdown", this.events.touchdown);
+            this.wrapper.removeEventListener("touchup", this.events.touchup);
+            this.wrapper.removeEventListener("touchcancel", this.events.touchup);
+            this.wrapper.removeEventListener("touchmove", this.events.touchmove);
+            if (this.bulletsWrapper) this.bulletsWrapper.removeEventListener("click", this.events.click);
+        }
+        clickBullets(e) {
+            const bullet = e.target.closest(`.${this.options.bulletClass}`);
+            if (bullet) {
+                const arrayChildren = Array.from(this.bulletsWrapper.children);
+                const idClickBullet = arrayChildren.indexOf(bullet);
+                this.switchingSection(idClickBullet);
+            }
+        }
+        setActiveBullet(idButton) {
+            if (!this.bulletsWrapper) return;
+            const bullets = this.bulletsWrapper.children;
+            for (let index = 0; index < bullets.length; index++) {
+                const bullet = bullets[index];
+                if (idButton === index) bullet.classList.add(this.options.bulletActiveClass); else bullet.classList.remove(this.options.bulletActiveClass);
+            }
+        }
+        touchDown(e) {
+            this._yP = e.changedTouches[0].pageY;
+            this._eventElement = e.target.closest(`.${this.options.activeClass}`);
+            if (this._eventElement) {
+                this._eventElement.addEventListener("touchend", this.events.touchup);
+                this._eventElement.addEventListener("touchcancel", this.events.touchup);
+                this._eventElement.addEventListener("touchmove", this.events.touchmove);
+                this.clickOrTouch = true;
+                if (isMobile.iOS()) {
+                    if (this._eventElement.scrollHeight !== this._eventElement.clientHeight) {
+                        if (0 === this._eventElement.scrollTop) this._eventElement.scrollTop = 1;
+                        if (this._eventElement.scrollTop === this._eventElement.scrollHeight - this._eventElement.clientHeight) this._eventElement.scrollTop = this._eventElement.scrollHeight - this._eventElement.clientHeight - 1;
+                    }
+                    this.allowUp = this._eventElement.scrollTop > 0;
+                    this.allowDown = this._eventElement.scrollTop < this._eventElement.scrollHeight - this._eventElement.clientHeight;
+                    this.lastY = e.changedTouches[0].pageY;
+                }
+            }
+        }
+        touchMove(e) {
+            const targetElement = e.target.closest(`.${this.options.activeClass}`);
+            if (isMobile.iOS()) {
+                let up = e.changedTouches[0].pageY > this.lastY;
+                let down = !up;
+                this.lastY = e.changedTouches[0].pageY;
+                if (targetElement) if (up && this.allowUp || down && this.allowDown) e.stopPropagation(); else if (e.cancelable) e.preventDefault();
+            }
+            if (!this.clickOrTouch || e.target.closest(this.options.noEventSelector)) return;
+            let yCoord = this._yP - e.changedTouches[0].pageY;
+            this.checkScroll(yCoord, targetElement);
+            if (this.goScroll && Math.abs(yCoord) > 20) this.choiceOfDirection(yCoord);
+        }
+        touchUp(e) {
+            this._eventElement.removeEventListener("touchend", this.events.touchup);
+            this._eventElement.removeEventListener("touchcancel", this.events.touchup);
+            this._eventElement.removeEventListener("touchmove", this.events.touchmove);
+            return this.clickOrTouch = false;
+        }
+        transitionend(e) {
+            if (e.target.closest(this.options.selectorSection)) {
+                this.stopEvent = false;
+                this.wrapper.classList.remove(this.options.wrapperAnimatedClass);
+            }
+        }
+        wheel(e) {
+            if (e.target.closest(this.options.noEventSelector)) return;
+            const yCoord = e.deltaY;
+            const targetElement = e.target.closest(`.${this.options.activeClass}`);
+            this.checkScroll(yCoord, targetElement);
+            if (this.goScroll) this.choiceOfDirection(yCoord);
+        }
+        choiceOfDirection(direction) {
+            this.stopEvent = true;
+            if (0 === this.activeSectionId && direction < 0 || this.activeSectionId === this.sections.length - 1 && direction > 0) this.stopEvent = false;
+            if (direction > 0 && false !== this.nextSection) this.activeSectionId = this.activeSectionId + 1 < this.sections.length ? ++this.activeSectionId : this.activeSectionId; else if (direction < 0 && false !== this.previousSection) this.activeSectionId = this.activeSectionId - 1 >= 0 ? --this.activeSectionId : this.activeSectionId;
+            if (this.stopEvent) this.switchingSection();
+        }
+        switchingSection(idSection = this.activeSectionId) {
+            this.activeSectionId = idSection;
+            this.wrapper.classList.add(this.options.wrapperAnimatedClass);
+            this.wrapper.addEventListener("transitionend", this.events.transitionEnd);
+            this.removeClasses();
+            this.setClasses();
+            this.setStyle();
+            if (this.options.bullets) this.setActiveBullet(this.activeSectionId);
+            this.options.onSwitching(this);
+            document.dispatchEvent(new CustomEvent("fpswitching", {
+                detail: {
+                    fp: this
+                }
+            }));
+        }
+        setBullets() {
+            this.bulletsWrapper = document.querySelector(`.${this.options.bulletsClass}`);
+            if (!this.bulletsWrapper) {
+                const bullets = document.createElement("div");
+                bullets.classList.add(this.options.bulletsClass);
+                this.wrapper.append(bullets);
+                this.bulletsWrapper = bullets;
+            }
+            if (this.bulletsWrapper) for (let index = 0; index < this.sections.length; index++) {
+                const span = document.createElement("span");
+                span.classList.add(this.options.bulletClass);
+                this.bulletsWrapper.append(span);
+            }
+        }
+        setZIndex() {
+            let zIndex = this.sections.length;
+            for (let index = 0; index < this.sections.length; index++) {
+                const section = this.sections[index];
+                section.style.zIndex = zIndex;
+                --zIndex;
+            }
+        }
+        removeZIndex() {
+            for (let index = 0; index < this.sections.length; index++) {
+                const section = this.sections[index];
+                section.style.zIndex = "";
+            }
+        }
+    }
+    if (document.querySelector("[data-fp]")) flsModules.fullpage = new FullPage(document.querySelector("[data-fp]"), "");
     let addWindowScrollEvent = false;
+    function pageNavigation() {
+        document.addEventListener("click", pageNavigationAction);
+        document.addEventListener("watcherCallback", pageNavigationAction);
+        function pageNavigationAction(e) {
+            if ("click" === e.type) {
+                const targetElement = e.target;
+                if (targetElement.closest("[data-goto]")) {
+                    const gotoLink = targetElement.closest("[data-goto]");
+                    const gotoLinkSelector = gotoLink.dataset.goto ? gotoLink.dataset.goto : "";
+                    const noHeader = gotoLink.hasAttribute("data-goto-header") ? true : false;
+                    const gotoSpeed = gotoLink.dataset.gotoSpeed ? gotoLink.dataset.gotoSpeed : 500;
+                    const offsetTop = gotoLink.dataset.gotoTop ? parseInt(gotoLink.dataset.gotoTop) : 0;
+                    if (flsModules.fullpage) {
+                        const fullpageSectionId = +document.querySelector(`${gotoLinkSelector}`).closest("[data-fp-section]").dataset.fpId;
+                        fullpageSectionId ? flsModules.fullpage.switchingSection(fullpageSectionId) : null;
+                        document.documentElement.classList.contains("menu-open") ? menuClose() : null;
+                    } else gotoBlock(gotoLinkSelector, noHeader, gotoSpeed, offsetTop);
+                    e.preventDefault();
+                }
+            } else if ("watcherCallback" === e.type && e.detail) {
+                const entry = e.detail.entry;
+                const targetElement = entry.target;
+                if ("navigator" === targetElement.dataset.watch) {
+                    document.querySelector(`[data-goto]._navigator-active`);
+                    let navigatorCurrentItem;
+                    if (targetElement.id && document.querySelector(`[data-goto="#${targetElement.id}"]`)) navigatorCurrentItem = document.querySelector(`[data-goto="#${targetElement.id}"]`); else if (targetElement.classList.length) for (let index = 0; index < targetElement.classList.length; index++) {
+                        const element = targetElement.classList[index];
+                        if (document.querySelector(`[data-goto=".${element}"]`)) {
+                            navigatorCurrentItem = document.querySelector(`[data-goto=".${element}"]`);
+                            break;
+                        }
+                    }
+                    if (entry.isIntersecting) navigatorCurrentItem ? navigatorCurrentItem.classList.add("_navigator-active") : null; else navigatorCurrentItem ? navigatorCurrentItem.classList.remove("_navigator-active") : null;
+                }
+            }
+        }
+        if (getHash()) {
+            let goToHash;
+            if (document.querySelector(`#${getHash()}`)) goToHash = `#${getHash()}`; else if (document.querySelector(`.${getHash()}`)) goToHash = `.${getHash()}`;
+            goToHash ? gotoBlock(goToHash, true, 500, 20) : null;
+        }
+    }
     setTimeout((() => {
         if (addWindowScrollEvent) {
             let windowScroll = new Event("windowScroll");
@@ -3341,91 +4162,14 @@
             }));
         }
     }), 0);
-    class DynamicAdapt {
-        constructor(type) {
-            this.type = type;
-        }
-        init() {
-            this.оbjects = [];
-            this.daClassname = "_dynamic_adapt_";
-            this.nodes = [ ...document.querySelectorAll("[data-da]") ];
-            this.nodes.forEach((node => {
-                const data = node.dataset.da.trim();
-                const dataArray = data.split(",");
-                const оbject = {};
-                оbject.element = node;
-                оbject.parent = node.parentNode;
-                оbject.destination = document.querySelector(`${dataArray[0].trim()}`);
-                оbject.breakpoint = dataArray[1] ? dataArray[1].trim() : "767";
-                оbject.place = dataArray[2] ? dataArray[2].trim() : "last";
-                оbject.index = this.indexInParent(оbject.parent, оbject.element);
-                this.оbjects.push(оbject);
-            }));
-            this.arraySort(this.оbjects);
-            this.mediaQueries = this.оbjects.map((({breakpoint}) => `(${this.type}-width: ${breakpoint}px),${breakpoint}`)).filter(((item, index, self) => self.indexOf(item) === index));
-            this.mediaQueries.forEach((media => {
-                const mediaSplit = media.split(",");
-                const matchMedia = window.matchMedia(mediaSplit[0]);
-                const mediaBreakpoint = mediaSplit[1];
-                const оbjectsFilter = this.оbjects.filter((({breakpoint}) => breakpoint === mediaBreakpoint));
-                matchMedia.addEventListener("change", (() => {
-                    this.mediaHandler(matchMedia, оbjectsFilter);
-                }));
-                this.mediaHandler(matchMedia, оbjectsFilter);
-            }));
-        }
-        mediaHandler(matchMedia, оbjects) {
-            if (matchMedia.matches) оbjects.forEach((оbject => {
-                this.moveTo(оbject.place, оbject.element, оbject.destination);
-            })); else оbjects.forEach((({parent, element, index}) => {
-                if (element.classList.contains(this.daClassname)) this.moveBack(parent, element, index);
-            }));
-        }
-        moveTo(place, element, destination) {
-            element.classList.add(this.daClassname);
-            if ("last" === place || place >= destination.children.length) {
-                destination.append(element);
-                return;
-            }
-            if ("first" === place) {
-                destination.prepend(element);
-                return;
-            }
-            destination.children[place].before(element);
-        }
-        moveBack(parent, element, index) {
-            element.classList.remove(this.daClassname);
-            if (void 0 !== parent.children[index]) parent.children[index].before(element); else parent.append(element);
-        }
-        indexInParent(parent, element) {
-            return [ ...parent.children ].indexOf(element);
-        }
-        arraySort(arr) {
-            if ("min" === this.type) arr.sort(((a, b) => {
-                if (a.breakpoint === b.breakpoint) {
-                    if (a.place === b.place) return 0;
-                    if ("first" === a.place || "last" === b.place) return -1;
-                    if ("last" === a.place || "first" === b.place) return 1;
-                    return 0;
-                }
-                return a.breakpoint - b.breakpoint;
-            })); else {
-                arr.sort(((a, b) => {
-                    if (a.breakpoint === b.breakpoint) {
-                        if (a.place === b.place) return 0;
-                        if ("first" === a.place || "last" === b.place) return 1;
-                        if ("last" === a.place || "first" === b.place) return -1;
-                        return 0;
-                    }
-                    return b.breakpoint - a.breakpoint;
-                }));
-                return;
-            }
-        }
-    }
-    const da = new DynamicAdapt("max");
-    da.init();
     window["FLS"] = true;
     isWebp();
     menuInit();
+    tabs();
+    formFieldsInit({
+        viewPass: false,
+        autoHeight: false
+    });
+    formSubmit();
+    pageNavigation();
 })();
